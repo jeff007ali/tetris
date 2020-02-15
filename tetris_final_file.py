@@ -155,15 +155,15 @@ def create_grid(locked_positions={}):
                         grid[i][j] = c
       return grid
 
-def convert_shape_format(piece):
+def convert_shape_format(shape):
       positions = []
-      format = piece.shape[piece.rotation % len(piece.shape)]
+      format = shape.shape[shape.rotation % len(shape.shape)]
 
       for i, line in enumerate(format):
             row = list(line)
             for j, column in enumerate(row):
                   if column == '0':
-                        positions.append((piece.x + j - 2, piece.y + i - 4))
+                        positions.append((shape.x + j - 2, shape.y + i - 4))
       
       return positions
 
@@ -200,12 +200,45 @@ def draw_grid(surface, grid):
             for j in range(len(grid[i])):
                   pygame.draw.line(surface, (128, 128, 128), (top_left_x + j * block_size, top_left_y), (top_left_x + j * block_size, top_left_y + play_height))
 
-      
 def clear_rows(grid, locked):
-      pass
+      inc = 0
+      for i in range(len(grid) - 1, -1, -1):
+            row = grid[i]
+            if (0, 0, 0) not in row:
+                  inc += 1
+
+                  ind = i
+                  # remove this line from dict
+                  for j in range(len(row)):
+                        try:
+                              del locked[(j, i)]
+                        except:
+                              continue
+                        
+      if inc > 0:
+            for key in sorted(list(locked), key = lambda x: x[1])[::-1]:
+                  x, y = key
+                  if y < ind:
+                        newKey = (x, y + inc)
+                        locked[newKey] = locked.pop(key)
+                  
+
 
 def draw_next_shape(shape, surface):
-      pass
+      font = pygame.font.SysFont('comicsans', 30)
+      label = font.render('Next Shape', 1, (255, 255, 255))
+
+      sx = top_left_x + play_width + 50
+      sy = top_left_y + play_height / 2 -100
+      format = shape.shape[shape.rotation % len(shape.shape)]
+
+      for i, line in enumerate(format):
+            row = list(line)
+            for j, column in enumerate(row):
+                  if column == '0':
+                        pygame.draw.rect(surface, shape.color, (sx + j * block_size, sy + i * block_size, block_size, block_size))
+
+      surface.blit(label, (sx + 10, sy - 30))
 
 def draw_window(surface, grid):
       surface.fill((0, 0, 0))
@@ -225,7 +258,7 @@ def draw_window(surface, grid):
 
       # Draw grid and border of playarea
       draw_grid(surface, grid)
-      pygame.display.update()
+      # pygame.display.update()
 
 def main(win):
 	
@@ -258,32 +291,38 @@ def main(win):
                         running = False
                   
                   if event.type == pygame.KEYDOWN:
+                        # to move shape left side
                         if event.key == pygame.K_LEFT:
                               current_piece.x -= 1
                               if not valid_space(current_piece, grid):
                                     current_piece.x += 1
-
+                        
+                        # to move shape right side
                         if event.key == pygame.K_RIGHT:
                               current_piece.x += 1
                               if not valid_space(current_piece, grid):
                                     current_piece.x -= 1
 
+                        # to move shape down side
                         if event.key == pygame.K_DOWN:
                               current_piece.y += 1
                               if not valid_space(current_piece, grid):
                                     current_piece.y -= 1
-
+                        
+                        # to rotate shape
                         if event.key == pygame.K_UP:
                               current_piece.rotation += 1
                               if not valid_space(current_piece, grid):
-                                    current_piece.x -= 1
+                                    current_piece.rotation -= 1
 
+            # add shape to grid for drawing purpose
             shape_pos = convert_shape_format(current_piece)
             for i in range(len(shape_pos)):
                   x, y = shape_pos[i]
                   if y > -1:
                         grid[y][x] = current_piece.color
 
+            # If piece hit the floor, change the shape
             if change_piece:
                   for pos in shape_pos:
                         p = (pos[0], pos[1])
@@ -291,8 +330,11 @@ def main(win):
                   current_piece = next_piece
                   next_piece = get_shape()
                   change_piece = False
+                  clear_rows(grid, locked_positions)
 
             draw_window(win, grid)
+            draw_next_shape(next_piece, win)
+            pygame.display.update()
 
             if check_lost(locked_positions):
                   running = False
